@@ -43,8 +43,9 @@ Label_Start:
     xor ah, ah
     xor dl, dl
     int 13h
-
-    jmp $
+endd:
+    hlt
+    jmp endd
 
 StartBootMessage: db "Start Booting --bizheng"
 
