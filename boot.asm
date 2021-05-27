@@ -119,6 +119,7 @@ Label_Start:
     xor ah, ah
     xor dl, dl
     int 13h
+
 ;=======  Search Loader.bin
     mov word [SectorNo], SectorNumOfRootDirStart
 
@@ -129,6 +130,7 @@ Lable_Search_In_Root_Dir_Begin:
     cmp word [RootDirSizeForLoop],  0
     ;在完成搜索后未发现"loader bin"文件则给出提示
     jz  Label_No_LoaderBin
+    call Func_PrintDot
     dec word [RootDirSizeForLoop]
     ; ax = 19
     ; cl = 1
@@ -147,7 +149,7 @@ Lable_Search_In_Root_Dir_Begin:
     ; (512/32 = 16 = 0x10)
     mov dx, 10h
 
-;=======  对载入内存的根目录进行遍历
+;=======  对新载入内存的根目录扇区进行遍历,查找文件名与目标文件名相同的目录项
 Label_Search_For_LoaderBin:
 
     ;若当前扇区的目录项遍历完后未发现目标文件
@@ -157,10 +159,7 @@ Label_Search_For_LoaderBin:
     dec dx
     ;文件名长度
     mov cx, 11
-
 Label_Cmp_FileName:
-
-    call Func_PrintDot
     cmp cx, 0
     jz Label_FileName_Found
     dec cx
@@ -187,9 +186,9 @@ Label_Different:
     jmp Label_Search_For_LoaderBin
 ;加载根目录占用的下一个扇区
 Label_Goto_Next_Sector_In_Root_Dir:
-    ; add word [SectorNo], 1
-    ; jmp Lable_Search_In_Root_Dir_Begin
-    jmp Label_Halt
+    add word [SectorNo], 1
+    jmp Lable_Search_In_Root_Dir_Begin
+    ;jmp Label_Halt
 
 ;=======  display hints: ERROR:No LOADER Found
 Label_No_LoaderBin:
@@ -268,7 +267,7 @@ Func_PrintDot:
 
 ;=======  tmp variable
 
-; 待搜索的根目录文件个数，初始值：14
+; 根目录所占扇区中待遍历扇区的个数，初始值：14
 RootDirSizeForLoop  dw  RootDirSectors
 
 ;当前遍历的扇区号
