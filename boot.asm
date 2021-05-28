@@ -311,8 +311,7 @@ Label_Go_On_Loading_File:
     add bx, [BPB_BytesPerSec]
     jmp Label_Go_On_Loading_File
 Label_File_Loaded:
-    
-    jmp Label_Halt
+    jmp BaseOfLoader:OffsetOfLoader
 
 ;=======  HLT
 Label_Halt:
