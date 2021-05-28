@@ -16,8 +16,9 @@ RootDirSectors          equ 14
 ; BPB_RsvdSecCnt + (BPB_FATSz16 * BPB_NumFATs) = 19
 SectorNumOfRootDirStart equ    19
 
-; FAT1表的起始扇区号
+; FAT1表的起始扇区号 值：1
 SectorNumOfFAT1Start    equ 1
+; 用于在使用文件名查找文件时方便计算 值：17
 SectorBalance           equ 17
 
     jmp short Label_Start
@@ -124,8 +125,7 @@ Label_Start:
     int 13h
 
 ;=======  Search Loader.bin
-    mov word [SectorNo], SectorNumOfRootDirStart
-
+;
 ;         +---------------------------------+
 ;         | Lable_Search_In_Root_Dir_Begin  |
 ;         +----------------+----------------+
@@ -161,19 +161,24 @@ Label_Start:
 ;       |       +----------+------+
 ;       +-------+ Label_Different |
 ;               +-----------------+
-;
-;=======  先将根目录加载到内存中(es:bx => 0x08000h)
+;=======  初始化查找扇区的编号
+    mov word [SectorNo], SectorNumOfRootDirStart
+;=======  先将根目录占用的扇区依次加载到内存中
 ;         加载完成后，在根目录中查找"loader.bin"文件
+;         1.数据缓冲区内存地址: es:bx => 0x08000h，
+;         2.当前加载的扇区编号: ax = [SectorNo]，初始值19
 Lable_Search_In_Root_Dir_Begin:
 
+    ;判断扇区是否全部遍历
     cmp word [RootDirSizeForLoop],  0
-    ;在完成搜索后未发现"loader bin"文件则给出提示
+    ;若在完成搜索后未发现"loader bin"文件，则给出提示
     jz  Label_No_LoaderBin
     call Func_PrintDot
     dec word [RootDirSizeForLoop]
-    ; ax = 19
+    ; 调用 Func_ReadOneSector ，从软盘中读取一个扇区，参数如下
+    ; ax = [SectorNo]
     ; cl = 1
-    ; es:bx => 0x08000h
+    ; es:bx => 0x8000
     mov ax, 00h
     mov es, ax
     mov bx, 8000h
@@ -184,13 +189,13 @@ Lable_Search_In_Root_Dir_Begin:
     mov si, LoaderFileName
     mov di, 8000h
     cld
-    ; dx记录每个扇区可容纳的目录项个数
+    ; dx初始值为每个扇区可容纳的目录项个数
     ; (512/32 = 16 = 0x10)
     mov dx, 10h
-
 ;=======  对新载入内存的根目录扇区进行遍历,查找文件名与目标文件名相同的目录项
+;         1.缓冲区内存地址 es:di => 8000h
+;         2.待遍历扇区个数 dx(初始值为16)
 Label_Search_For_LoaderBin:
-
     ;若当前扇区的目录项遍历完后未发现目标文件
     ;则加载根目录的下一个扇区
     cmp dx, 0
@@ -206,6 +211,7 @@ Label_Cmp_FileName:
     ;当前ds = es = cs = 0x0000h
     ;此处加载到al的数据源是 "LoaderFileName"=>"LOADER  BIN",0
     lodsb
+    ;al = [ds:si]
     ;ds:si => LoaderFileName => "LOADER  BIN",0
     ;es:di => 0x8000h
     cmp al, byte [es:di]
@@ -213,7 +219,7 @@ Label_Cmp_FileName:
     jz Label_Go_On
     jmp Label_Different
 Label_Go_On:
-    ; 比较下一位
+    ; 比较目录项下一位字符是与"loader  bin"对应位置的字符相同
     inc di
     jmp Label_Cmp_FileName
 Label_Different:
@@ -223,6 +229,7 @@ Label_Different:
     add di,20h
     mov si, LoaderFileName
     jmp Label_Search_For_LoaderBin
+    
 ;加载根目录占用的下一个扇区
 Label_Goto_Next_Sector_In_Root_Dir:
     add word [SectorNo], 1
@@ -246,7 +253,7 @@ Label_No_LoaderBin:
 ;=======  found loader.bin name in root director struct
 ; 找到文件
 Label_FileName_Found:
-
+    call Func_PrintExclamation
     jmp Label_Halt
 
 ;=======  HLT
@@ -287,7 +294,9 @@ Label_Go_On_Reading:
     pop  bp
     ret
 
-;=======  print 
+;=======  print function
+
+;=======  打印字符 '.'
 Func_PrintDot:
     push    ax
     push    bx
@@ -306,6 +315,24 @@ Func_PrintDot:
     pop     ax
     ret
 
+;=======  打印字符 '!'
+Func_PrintExclamation:
+    push    ax
+    push    bx
+    push    cx
+    ; call int 10h,function num = 0x0e
+    ; al = '.'
+    ; bl = 字体前景色
+    mov     ah,     0eh
+    mov     al,     '!'
+    mov     bh,     00h
+    mov     bl,     0fh
+    mov     cx,     00h
+    int     10h
+    pop     cx
+    pop     bx
+    pop     ax
+    ret
 ;=======  根据当前FAT表项索引出下一个FAT表项
 ;=======  ah:FAT表项号(输入参数/输出参数)
 Func_GetFATEntry:
@@ -351,7 +378,7 @@ Label_Even_2:
 ; 根目录所占扇区中待遍历扇区的个数，初始值：14
 RootDirSizeForLoop  dw  RootDirSectors
 
-;当前遍历的扇区号
+;当前遍历的扇区号，初始值：0
 SectorNo    dw  0
 Odd      db  0
 
