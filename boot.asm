@@ -3,7 +3,9 @@ org 0x7c00
 BaseOfStack             equ 0x7c00
 
 ; BaseOfLoader << 4+ OffsetOfLoader = 0x10000
+; Loader的段基址 0x1000
 BaseOfLoader            equ 0x1000
+; Loader的段内偏移地址
 OffsetOfLoader          equ 0x00
 
 ; ceil 根据扇区大小向上取整
@@ -109,7 +111,7 @@ Label_Start:
     mov bx, 000fh
     mov dx, 0000h
     ; cx <= count of characters of the string you want to display
-    mov cx, 23
+    mov cx, 10
     ; es:bp => start of string 
     push ax
     mov ax, ds
@@ -173,7 +175,8 @@ Lable_Search_In_Root_Dir_Begin:
     cmp word [RootDirSizeForLoop],  0
     ;若在完成搜索后未发现"loader bin"文件，则给出提示
     jz  Label_No_LoaderBin
-    call Func_PrintDot
+    ; mov ax, '.'
+    ; call Func_PrintCharInAL
     dec word [RootDirSizeForLoop]
     ; 调用 Func_ReadOneSector ，从软盘中读取一个扇区，参数如下
     ; ax = [SectorNo]
@@ -220,9 +223,16 @@ Label_Cmp_FileName:
     jmp Label_Different
 Label_Go_On:
     ; 比较目录项下一位字符是与"loader  bin"对应位置的字符相同
+    call Func_PrintCharInAL
     inc di
     jmp Label_Cmp_FileName
 Label_Different:
+    ; 换行 LF
+    ; mov al,0x0A
+    ; call Func_PrintCharInAL
+    ; 清空 CR
+    ; mov al,0x0D
+    ; call Func_PrintCharInAL
     ;取整
     and di,0ffe0h
     ;跳至下一个目录项
@@ -240,7 +250,7 @@ Label_Goto_Next_Sector_In_Root_Dir:
 Label_No_LoaderBin:
     mov  ax,  1301h
     mov  bx,  000ch
-    mov  cx,  21
+    mov  cx,  13
     mov  dx,  0100h
     push  ax
     mov  ax,  ds
@@ -253,7 +263,55 @@ Label_No_LoaderBin:
 ;=======  found loader.bin name in root director struct
 ; 找到文件
 Label_FileName_Found:
-    call Func_PrintExclamation
+
+    mov ax, RootDirSectors
+    ; 此时es:di 指向文件名末尾后的第一个字节
+    ; 0000 0000 0001 1111  :目录项大小 32B
+    ; 1111 1111 1110 0000  :0xffe0
+    ; di同0xffe0进行与运算，清除文件名比较过程中di作为索引自增的值
+    and di, 0ffe0h
+    ; 找到目录项中，‘DIR_FstClus’的位置
+    add di, 01ah
+    ; 文件的起始簇号
+    mov cx, word [es:di]
+    push cx
+    ; 因为FAT12中一扇区为一簇，所以可以直接通过扇区数找到对应的簇
+    add cx, ax
+    ; FAT表中，前两个FAT表项在数据区中没有对应的簇，所以在目录项中\
+    ; 的簇号‘DIR_FstClus’对应的扇区需要前移两位(在本书中计算簇号\
+    ; 对应的扇区号采取直接计算的方式，没有采取更复杂的计算方式)，这\
+    ; 里使用‘SectorBalance’直接进行计算。
+    add cx, SectorBalance
+    ; BaseOfLoader << 4+ OffsetOfLoader = 0x10000
+    mov ax, BaseOfLoader
+    mov es, ax
+    mov bx, OffsetOfLoader
+    ; ax = loader.bin起始扇区号
+    mov ax, cx
+Label_Go_On_Loading_File:
+    ; ax = RootDirSectors + SectorBalance + DIR_FstClus(目录\
+    ; 项中的起始簇号)
+    ; cl = 1
+    ; es:bx => BaseOfLoader << 4+ OffsetOfLoader = 0x10000
+    mov cl, 1
+    call Func_ReadOneSector
+    ; ax = DIR_FstClus(目录项的起始簇号)
+    pop ax
+    call Func_GetFATEntry
+    ; 0x0fff表示文件簇链表的末尾
+    cmp ax, 0fffh
+    jz Label_File_Loaded
+    ; 在调用Func_GetFATEntry后，ax存储的是下一个待读入的簇号
+    push ax
+    ; 根据簇号计算该簇对应的扇区号
+    mov dx, RootDirSectors
+    add ax, dx
+    add ax, SectorBalance
+    ; 当前扇区内容加载完毕，更新es:bx所指向的内存地址，为加载下一个扇区做准备
+    add bx, [BPB_BytesPerSec]
+    jmp Label_Go_On_Loading_File
+Label_File_Loaded:
+    
     jmp Label_Halt
 
 ;=======  HLT
@@ -262,6 +320,9 @@ Label_Halt:
     jmp Label_Halt
 
 ;=======  read one sector from floppy
+; ax = 待读取的磁盘扇区起始号
+; cl = 读入的扇区数量
+; es:bx = 目标缓冲区起始地址
 Func_ReadOneSector:
     
     push  bp
@@ -294,10 +355,8 @@ Label_Go_On_Reading:
     pop  bp
     ret
 
-;=======  print function
-
-;=======  打印字符 '.'
-Func_PrintDot:
+;=======  打印寄存器‘AL’中字符
+Func_PrintCharInAL:
     push    ax
     push    bx
     push    cx
@@ -305,26 +364,6 @@ Func_PrintDot:
     ; al = '.'
     ; bl = 字体前景色
     mov     ah,     0eh
-    mov     al,     '.'
-    mov     bh,     00h
-    mov     bl,     0fh
-    mov     cx,     00h
-    int     10h
-    pop     cx
-    pop     bx
-    pop     ax
-    ret
-
-;=======  打印字符 '!'
-Func_PrintExclamation:
-    push    ax
-    push    bx
-    push    cx
-    ; call int 10h,function num = 0x0e
-    ; al = '.'
-    ; bl = 字体前景色
-    mov     ah,     0eh
-    mov     al,     '!'
     mov     bh,     00h
     mov     bl,     0fh
     mov     cx,     00h
@@ -334,7 +373,7 @@ Func_PrintExclamation:
     pop     ax
     ret
 ;=======  根据当前FAT表项索引出下一个FAT表项
-;=======  ah:FAT表项号(输入参数/输出参数)
+;         ah:FAT表项号(输入参数/输出参数)
 Func_GetFATEntry:
     push es
     push bx
@@ -385,9 +424,9 @@ Odd      db  0
 ;=======  display messages=
 
 ; "Start Booting --bizheng"
-StartBootMessage:   db "Start Booting --bizheng"
+StartBootMessage:   db "Start Boot"
 ; "ERROR:No LOADER Found"
-NoLoaderMessage:    db "ERROR:No LOADER Found"
+NoLoaderMessage:    db "ERR:No LOADER"
 ; "LOADER  BIN",0
 LoaderFileName:    db  "LOADER  BIN",0
 ;==========  fill the rest of remaining sector with zero ==========
