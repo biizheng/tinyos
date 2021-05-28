@@ -2,8 +2,9 @@
 # input the name without suffix of asm file
 
 #  ./boot.sh boot
-#nasm boot.asm -o boot.bin -l.lst 
-nasm $1.asm -o $1.bin -l $1.lst 
+# nasm boot.asm -o boot.bin -l boot.lst 
+# nasm loader.asm -o loader.bin -l loader.lst 
+#nasm $1.asm -o $1.bin -l $1.lst 
 
 # write your compiled progarm into a virtual iamge
 # if    input file: in this case ,the input file is "$1.bin"

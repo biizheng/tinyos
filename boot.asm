@@ -4,7 +4,7 @@ BaseOfStack             equ 0x7c00
 
 ; BaseOfLoader << 4+ OffsetOfLoader = 0x10000
 BaseOfLoader            equ 0x1000
-OffsetOfLoader          equ 0x1000
+OffsetOfLoader          equ 0x00
 
 ; ceil 根据扇区大小向上取整
 ; 代码RootDirSectors equ 14定义了根目录占用的扇区数，这个数值是根据FAT12文件系统提供的信息经过计算而得
@@ -15,6 +15,8 @@ RootDirSectors          equ 14
 ; 这个数值也是通过计算而得，即：保留扇区数 + FAT表扇区数 * FAT表份数
 ; BPB_RsvdSecCnt + (BPB_FATSz16 * BPB_NumFATs) = 19
 SectorNumOfRootDirStart equ    19
+
+; FAT1表的起始扇区号
 SectorNumOfFAT1Start    equ 1
 SectorBalance           equ 17
 
@@ -107,6 +109,7 @@ Label_Start:
     mov dx, 0000h
     ; cx <= count of characters of the string you want to display
     mov cx, 23
+    ; es:bp => start of string 
     push ax
     mov ax, ds
     mov es, ax
@@ -207,9 +210,9 @@ Label_Cmp_FileName:
     ;es:di => 0x8000h
     cmp al, byte [es:di]
     ;若相同则继续进行比较
-    jz Label_Go_on
+    jz Label_Go_On
     jmp Label_Different
-Label_Go_on:
+Label_Go_On:
     ; 比较下一位
     inc di
     jmp Label_Cmp_FileName
@@ -238,6 +241,17 @@ Label_No_LoaderBin:
     pop  ax
     mov  bp,  NoLoaderMessage
     int  10h
+    jmp Label_Halt
+
+;=======  found loader.bin name in root director struct
+; 找到文件
+Label_FileName_Found:
+
+    jmp Label_Halt
+
+;=======  HLT
+Label_Halt:
+    hlt
     jmp Label_Halt
 
 ;=======  read one sector from floppy
@@ -273,15 +287,6 @@ Label_Go_On_Reading:
     pop  bp
     ret
 
-;=======  found loader.bin name in root director struct
-; 找到文件
-Label_FileName_Found:
-    jmp Label_Halt
-
-;=======  HLT
-Label_Halt:
-    hlt
-    jmp Label_Halt
 ;=======  print 
 Func_PrintDot:
     push    ax
@@ -299,6 +304,46 @@ Func_PrintDot:
     pop     cx
     pop     bx
     pop     ax
+    ret
+
+;=======  根据当前FAT表项索引出下一个FAT表项
+;=======  ah:FAT表项号(输入参数/输出参数)
+Func_GetFATEntry:
+    push es
+    push bx
+    push ax
+    mov ax, 00
+    mov es, ax
+    pop ax
+
+    mov byte [Odd], 0
+    mov bx, 3
+    mul bx
+    mov bx,2
+    div bx
+    cmp dx, 0
+    jz Label_Even
+    mov byte [Odd], 1
+Label_Even:
+    xor dx, dx
+    mov bx,[BPB_BytesPerSec]
+    div bx
+    push dx
+    mov bx, 8000h
+    add ax, SectorNumOfFAT1Start
+    mov cl, 2
+    call Func_ReadOneSector
+
+    pop dx
+    add bx, dx
+    mov ax, [es:bx]
+    cmp byte [Odd], 1
+    jnz Label_Even_2
+    shr ax, 4
+Label_Even_2:
+    and ax, 0fffh
+    pop bx
+    pop es 
     ret
 
 ;=======  tmp variable
