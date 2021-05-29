@@ -15,10 +15,10 @@
 #       even if the input file is smaller than the output file
 
 #dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
-dd if=$1.bin of=$1.img bs=512 count=1 conv=notrunc
+dd if=../bin/$1.bin of=../bin/$1.img bs=512 count=1 conv=notrunc
 
 # -q    skip the "Bochs Configuration Main menu"
 # -f    to define a configuration file
 # -rc   you can put the instruct you want to execute 
 #       when your program in bochs start up
-bochs -q -f ./bochsrc.properties -rc ./run.cfg
+bochs -q -f ../config/bochsrc.properties -rc ../config/run.cfg
