@@ -15,6 +15,7 @@
 #       even if the input file is smaller than the output file
 
 #dd if=boot.bin of=boot.img bs=512 count=1 conv=notrunc
+#dd if=../bin/boot.bin of=../bin/boot.img bs=512 count=1 conv=notrunc
 dd if=../bin/$1.bin of=../bin/$1.img bs=512 count=1 conv=notrunc
 
 # -q    skip the "Bochs Configuration Main menu"

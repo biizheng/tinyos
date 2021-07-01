@@ -426,7 +426,7 @@ Odd      db  0
 StartBootMessage:   db "Start Boot"
 ; "ERROR:No LOADER Found"
 NoLoaderMessage:    db "ERR:No LOADER"
-; "LOADER  BIN",0
+; "LOADER  BIN",0   
 LoaderFileName:    db  "LOADER  BIN",0
 ;==========  fill the rest of remaining sector with zero ==========
 

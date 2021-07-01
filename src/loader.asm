@@ -5,11 +5,14 @@ org 10000h
 ; 引入FAT12文件系统结构
 %include "./include/fat12.inc"
 
+; 内核程序起始物理地址基址  0x00
 BaseOfKernelFile	equ	0x00
+; 内核程序起始物理地址偏移地址  0x100000
 OffsetOfKernelFile	equ	0x100000
 
-
+; 内核程序临时转存空间基址
 BaseTmpOfKernelAddr	equ	0x00
+; 内核程序临时转存空间偏移地址
 OffsetTmpOfKernelFile	equ	0x7E00
 
 
@@ -53,6 +56,7 @@ Label_Loader_Start:
     pop ax
     mov bp, StartLoaderMessage
     int 10h
+    
 ;   open address A20
 ;   开启A20地址线
     push ax
