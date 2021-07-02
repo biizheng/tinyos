@@ -8,9 +8,9 @@ BaseOfLoader            equ 0x1000
 ; Loader的段内偏移地址
 OffsetOfLoader          equ 0x00
 
-; ceil 根据扇区大小向上取整
 ; 代码RootDirSectors equ 14定义了根目录占用的扇区数，这个数值是根据FAT12文件系统提供的信息经过计算而得
 ; (BPB_RootEntCnt ＊ 32 + BPB_BytesPerSec -1) / BPB_Bytes PerSec =(224×32 + 512-1) / 512 = 14
+; 注：计算结果需要根据扇区大小向上取整，这里除法后的计算结果为14.99....，向上取整后为14
 RootDirSectors          equ 14
 
 ; 等价语句SectorNumOfRootDirStart equ 19 定义了根目录的起始扇区号
