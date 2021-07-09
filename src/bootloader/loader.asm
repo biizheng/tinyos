@@ -17,7 +17,7 @@ BaseTmpOfKernelAddr     equ 0x00
 ; 内核程序临时转存空间偏移地址
 OffsetTmpOfKernelFile   equ 0x7E00
 
-
+; 物理地址空间结构体数组地址
 MemoryStructBufferAddr  equ 0x7E00
 
 [SECTION gdt]
@@ -32,6 +32,20 @@ GdtPtr  dw  GdtLen - 1
 
 SelectorCode32  equ  LABEL_DESC_CODE32 - LABEL_GDT
 SelectorData32  equ  LABEL_DESC_DATA32 - LABEL_GDT
+
+[SECTION gdt64]
+
+LABEL_GDT64:        dq  0x0000000000000000
+LABEL_DESC_CODE64:  dq  0x0020980000000000
+LABEL_DESC_DATA64:  dq  0x0000920000000000
+
+GdtLen64    equ $ - LABEL_GDT64
+GdtPtr64    dw  GdtLen64 - 1
+            dd  LABEL_GDT64
+
+SelectorCode64  equ   LABEL_DESC_CODE64 - LABEL_GDT64
+SelectorData64  equ   LABEL_DESC_DATA64 - LABEL_GDT64
+
 ; BITS伪指令可以告知编译器，下述代码将在16位宽的处理器上运行
 ; 
 [SECTION .s16]
@@ -48,7 +62,7 @@ Label_Loader_Start:
 ;=======  在屏幕上打印字符串：”Start Loader .....“
 ;=======  display message on screen : Start Loader .....
 
-    mov ax, 1301h   
+    mov ax, 1301h    
     mov bx, 000fh   ;color
     mov cx, 12      ;length of string
     mov dx, 0200h   ;row 2
@@ -166,7 +180,7 @@ Label_Cmp_FileName:
     mov al, '.'
     call Func_Loader_PrintCharInAL
 
-    cmp cx,	0
+    cmp cx, 0
     jz Label_FileName_Found
     dec cx
     ;该指令从DS:SI寄存器指定的内存地址中读取一字节数据到AL寄存器
@@ -236,7 +250,7 @@ Label_Go_On_Loading_File:
 
     ; ax => 目录项中文件的起始簇号
     pop ax
-;;;;;;;;;;;;;;;;;;;;;;;	
+;;;;;;;;;;;;;;;;;;;;;;; 
     push cx
     push eax
     push fs
@@ -279,7 +293,7 @@ Label_Mov_Kernel:
     pop fs
     pop eax
     pop cx
-;;;;;;;;;;;;;;;;;;;;;;;	
+;;;;;;;;;;;;;;;;;;;;;;; 
 
     call Func_GetFATEntry
     cmp ax, 0fffh
@@ -291,22 +305,343 @@ Label_Mov_Kernel:
     add bx, [BPB_BytesPerSec]
     jmp Label_Go_On_Loading_File
 Label_File_Loaded:
-    mov	ax, 0B800h
-    mov	gs, ax
-    mov	ah, 8Fh				; 0000: 黑底    1111: 白字
-    mov	al, 'G'
-    mov	[gs:((80 * 0 + 39) * 2)], ax	; 屏幕第 0 行, 第 39 列。
+    mov ax, 0B800h
+    mov gs, ax
+    mov ah, 8Fh    ; 0000: 黑底    1111: 白字
+    mov al, 'G'
+    mov [gs:((80 * 0 + 39) * 2)], ax ; 屏幕第 0 行, 第 39 列。
 
 KillMotor:
 
-    push	dx
-    mov	dx,	03F2h
-    mov	al,	0	
-    out	dx,	al
-    pop	dx
+    push dx
+    mov dx, 03F2h
+    mov al, 0 
+    out dx, al
+    pop dx
 
+;=======  get memory address size type
+
+    ; 打印提示信息
+    mov ax, 1301h
+    mov bx, 000Fh
+    mov dx, 0400h   ;row 4
+    mov cx, 24
+    push ax
+    mov ax, ds
+    mov es, ax
+    pop ax
+    mov bp, StartGetMemStructMessage
+    int 10h
+
+    mov ebx, 0
+    mov ax, 0x00
+    mov es, ax
+    mov di, MemoryStructBufferAddr 
+
+Label_Get_Mem_Struct:
+
+    ; 借助int 15中断服务程序来获取物理地址空间信息
+    ; 获取到的信息保存在0x7e00 地址处
+    mov eax, 0x0E820
+    mov ecx, 20
+    mov edx, 0x534D4150
+    int 15h
+
+    ; 若内存信息获取失败，跳转至相应为位置
+    jc Label_Get_Mem_Fail
+    add di, 20
+
+    cmp ebx, 0
+    jne Label_Get_Mem_Struct
+    jmp Label_Get_Mem_OK
+Label_Get_Mem_Fail:
+    mov ax, 1301h
+    mov bx, 008Ch
+    mov dx, 0500h   ;row 5
+    mov cx, 23
+    push ax
+    mov ax, ds
+    mov es, ax
+    pop ax
+    mov bp, GetMemStructErrMessage
+    int 10h
+    jmp $
+Label_Get_Mem_OK:
+    mov ax, 1301h
+    mov bx, 000Fh
+    mov dx, 0600h   ;row 6
+    mov cx, 29
+    push ax
+    mov ax, ds
+    mov es, ax
+    pop ax
+    mov bp, GetMemStructOKMessage
+    int 10h 
+
+;======= get SVGA information
+    mov ax, 1301h
+    mov bx, 000Fh
+    mov dx, 0800h   ;row 8
+    mov cx, 23
+    push ax
+    mov ax, ds
+    mov es, ax
+    pop ax
+    mov bp, StartGetSVGAVBEInfoMessage
+    int 10h
+
+    mov ax,  0x00
+    mov es,  ax
+    mov di,  0x8000
+    mov ax,  4F00h
+    int 10h
+
+    cmp ax,  004Fh
+
+    jz  .KO
+;=======    Fail
+    mov ax,  1301h
+    mov bx,  008Ch
+    mov dx,  0900h ;row 9
+    mov cx,  23
+    push    ax
+    mov ax,  ds
+    mov es,  ax
+    pop ax
+    mov bp,  GetSVGAVBEInfoErrMessage
+    int 10h
+
+    jmp $
+.KO:
+    mov ax,  1301h
+    mov bx,  000Fh
+    mov dx,  0A00h ;row 10
+    mov cx,  29
+    push    ax
+    mov ax,  ds
+    mov es,  ax
+    pop ax
+    mov bp,  GetSVGAVBEInfoOKMessage
+    int 10h
+
+;=======    Get SVGA Mode Info
+    mov ax,  1301h
+    mov bx,  000Fh
+    mov dx,  0C00h ;row 12
+    mov cx,  24
+    push    ax
+    mov ax,  ds
+    mov es,  ax
+    pop ax
+    mov bp,  StartGetSVGAModeInfoMessage
+    int 10h
+
+
+    mov ax,  0x00
+    mov es,  ax
+    mov si,  0x800e
+
+    mov esi, dword    [es:si]
+    mov edi, 0x8200
+Label_SVGA_Mode_Info_Get:
+
+    mov cx,  word  [es:esi]
+
+;=======    display SVGA mode information
+
+    push    ax
+
+    mov ax,  00h
+    mov al,  ch
+    call    Func_Loader_DispAL
+
+    mov ax,  00h
+    mov al,  cl    
+    call    Func_Loader_DispAL
+
+    pop ax
+;=======
+
+    cmp cx,  0FFFFh
+    jz  Label_SVGA_Mode_Info_Finish
+
+    mov ax,  4F01h
+    int 10h
+
+    cmp ax,  004Fh
+
+    jnz Label_SVGA_Mode_Info_FAIL    
+
+    add esi, 2
+    add edi, 0x100
+
+    jmp Label_SVGA_Mode_Info_Get
+Label_SVGA_Mode_Info_FAIL:
+
+    mov ax,  1301h
+    mov bx,  008Ch
+    mov dx,  0D00h ;row 13
+    mov cx,  24
+    push    ax
+    mov ax,  ds
+    mov es,  ax
+    pop ax
+    mov bp,  GetSVGAModeInfoErrMessage
+    int 10h
+
+Label_SET_SVGA_Mode_VESA_VBE_FAIL:
+
+    jmp $
+Label_SVGA_Mode_Info_Finish:
+
+    mov ax,  1301h
+    mov bx,  000Fh
+    mov dx,  0E00h ;row 14
+    mov cx,  30
+    push    ax
+    mov ax,  ds
+    mov es,  ax
+    pop ax
+    mov bp,  GetSVGAModeInfoOKMessage
+    int 10h
+
+;=======    set the SVGA mode(VESA VBE)
+
+    mov ax,  4F02h
+    mov bx,  4180h ;========================mode : 0x180 or 0x143
+    int     10h
+
+    cmp ax,  004Fh
+    jnz Label_SET_SVGA_Mode_VESA_VBE_FAIL
+
+;=======    init IDT GDT goto protect mode 
+
+    cli ;======close interrupt
+
+    db  0x66
+    lgdt    [GdtPtr]
+
+;   db 0x66
+;   lidt   [IDT_POINTER]
+
+    mov eax, cr0
+    or  eax,  1
+    mov cr0, eax  
+
+    jmp dword SelectorCode32:GO_TO_TMP_Protect
+
+[SECTION .s32]
+[BITS 32]
+
+GO_TO_TMP_Protect:
+
+;=======    go to tmp long mode
+
+    mov ax,  0x10
+    mov ds,  ax
+    mov es,  ax
+    mov fs,  ax
+    mov ss,  ax
+    mov esp, 7E00h
+
+    call    support_long_mode
+    test    eax,    eax
+
+    jz  no_support
+
+;=======    init temporary page table 0x90000
+
+    mov dword    [0x90000],  0x91007
+    mov dword    [0x90004],  0x00000
+    mov dword    [0x90800],  0x91007
+    mov dword    [0x90804],  0x00000
+
+    mov dword    [0x91000],  0x92007
+    mov dword    [0x91004],  0x00000
+
+    mov dword    [0x92000],  0x000083
+    mov dword    [0x92004],  0x000000
+
+    mov dword    [0x92008],  0x200083
+    mov dword    [0x9200c],  0x000000
+
+    mov dword    [0x92010],  0x400083
+    mov dword    [0x92014],  0x000000
+
+    mov dword    [0x92018],  0x600083
+    mov dword    [0x9201c],  0x000000
+
+    mov dword    [0x92020],  0x800083
+    mov dword    [0x92024],  0x000000
+
+    mov dword    [0x92028],  0xa00083
+    mov dword    [0x9202c],  0x000000
+
+;=======    load GDTR
+
+    db  0x66
+    lgdt    [GdtPtr64]
+    mov ax,  0x10
+    mov ds,  ax
+    mov es,  ax
+    mov fs,  ax
+    mov gs,  ax
+    mov ss,  ax
+
+    mov esp, 7E00h
+
+;=======    open PAE
+
+    mov eax, cr4
+    bts eax, 5
+    mov cr4, eax
+
+;=======    load    cr3
+
+    mov eax, 0x90000
+    mov cr3, eax
+
+;=======    enable long-mode
+
+    mov ecx, 0C0000080h   ;IA32_EFER
+    rdmsr
+
+    bts eax, 8
+    wrmsr
+
+;=======    open PE and paging
+
+    mov eax, cr0
+    bts eax, 0
+    bts eax, 31
+    mov cr0, eax
+
+    jmp SelectorCode64:OffsetOfKernelFile
+
+;=======    test support long mode or not
+
+support_long_mode:
+
+	mov	eax,	0x80000000
+	cpuid
+	cmp	eax,	0x80000001
+	setnb	al	
+	jb	support_long_mode_done
+	mov	eax,	0x80000001
+	cpuid
+	bt	edx,	29
+	setc	al
+support_long_mode_done:
+	
+	movzx	eax,	al
+	ret
+
+;=======    no support
+
+no_support:
     jmp Func_Loader_Halt
 
+;=======    read one sector from floppy
 ;=======  读入一个扇区
 ; 本函数对int13h中断的02号函数进行了封装，详见P46
 ; ax = 待读取的磁盘扇区起始号
@@ -333,8 +668,8 @@ Func_ReadOneSector:
     shr  al,  1
     mov  ch,  al
 
-    pop	bx  
-    mov	dl,	[BS_DrvNum]
+    pop bx  
+    mov dl, [BS_DrvNum]
 Label_Go_On_Reading:
     mov ah, 2
     mov al, byte [bp - 2] ; byte[bp-2]： cl的值
@@ -362,6 +697,42 @@ Func_Loader_PrintCharInAL:
     int 10h
     pop cx
     pop bx
+    ret
+
+;======= display num in al
+
+Func_Loader_DispAL:
+    push ecx
+    push edx
+    push edi
+
+    mov edi, [DisplayPosition]
+    mov ah, 0Fh
+    mov dl, al
+    shr al, 4
+    mov ecx, 2
+.begin:
+    and al, 0Fh
+    cmp al, 9
+    ja .1
+    add al, '0'
+    jmp .2
+.1:
+    sub al, 0Ah
+    add al, 'A'
+.2:
+    mov [gs:edi], ax
+    add edi, 2
+
+    mov al, dl
+    loop .begin
+
+    mov [DisplayPosition], edi
+
+    pop edi
+    pop edx
+    pop ecx
+
     ret
 
 ;=======  打印载入的扇区中的文件名
@@ -397,7 +768,7 @@ func_pfn_end:
     pop ax
     ret
 
-;=======	get FAT Entry
+;======= get FAT Entry
 
 Func_GetFATEntry:
 
@@ -440,6 +811,17 @@ Label_Even_2:
     pop es
     ret
 
+;=======    tmp IDT
+
+IDT:
+    times   0x50   dq 0
+IDT_END:
+
+IDT_POINTER:
+    dw  IDT_END - IDT - 1
+    dd  IDT
+
+
 ;=======  临时变量
 
 ; 根目录所占扇区中待遍历扇区的个数，初始值：14
@@ -450,6 +832,8 @@ Odd         db  0
 ;由于内核体积庞大必须逐个簇地读取和转存，每次转存内核程序片段时必须保存目标偏移值，
 ;该值（EDI寄存器）保存于临时变量OffsetOfKernelFileCount中。
 OffsetOfKernelFileCount dd  OffsetOfKernelFile
+
+DisplayPosition  dd 0
 
 ;=======  display messages
 
@@ -462,3 +846,15 @@ NoKernelMessage: db "ERROR:No KERNEL Found"
 ;内核文件在文件系统中的 DIR_Name : "KERNEL  BIN"
 KernelFileName: db "KERNEL  BIN",0
 
+; 获取物理地址空间信息提示字符串
+StartGetMemStructMessage:       db "Start Get Memory Struct."
+StartGetSVGAModeInfoMessage:    db "Start Get SVGA Mode Info"
+StartGetSVGAVBEInfoMessage:     db "Start Get SVGA VBE Info"
+GetMemStructOKMessage:          db "Get Memory Struct SUCCESSFUL!"
+GetSVGAVBEInfoOKMessage:        db "Get SVGA VBE Info SUCCESSFUL!"
+GetSVGAModeInfoOKMessage:       db "Get SVGA Mode Info SUCCESSFUL!"
+
+; 获取物理地址空间信息失败提示
+GetMemStructErrMessage:         db "Get Memory Struct ERROR"
+GetSVGAVBEInfoErrMessage:       db "Get SVGA VBE Info ERROR"
+GetSVGAModeInfoErrMessage:      db "Get SVGA Mode Info ERROR"
