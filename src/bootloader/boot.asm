@@ -52,7 +52,7 @@ BPB_Media       db  0xf0
 ;每FAT扇区数
 BPB_FATSz16     dw  9
 
-;每磁道扇区数
+;每磁道扇区数 18
 BPB_SecPerTrk   dw  18
 
 ;磁头数
@@ -128,41 +128,51 @@ Label_Start:
 
 ;=======  Search Loader.bin
 ;
-;         +---------------------------------+
-;         | Lable_Search_In_Root_Dir_Begin  |
-;         +----------------+----------------+
-;                          |      RootDirSizeForLoop=0
-;                          +------------+
-;                          |            |
-;                          |  +---------v----------+
-;                          |  | Label_No_LoaderBin |
-;                          |  +--------------------+
-;                          v
-;           +--------------+-------------+
-;       +-> | Label_Search_For_LoaderBin |
-;       |   +--------------+-------------+
-;       |                  |           DX=0
-;       |                  +------------+
-;       |                  |            |
-;       |                  |  +---------v--------------------------+
-;       |                  |  | Label_Goto_Next_Sector_In_Root_Dir |
-;       |                  |  +------------------------------------+
-;       |                  v
-;       |       +----------+---------+
-;       |   +-> | Label_Cmp_FileName |
-;       |   |   +----------+---------+
-;       |   |              |          CX=0
-;       | +-------------+  +------------+
-;       | | Label_Go_On |  |            |
-;       | +-------------+  |  +---------v------------+
-;       |    ^             |  | Label_FileName_Found |
-;       |    |             |  +----------------------+
-;       |    +-------------+
-;       |   Not Equal      |
-;       |                  v
-;       |       +----------+------+
-;       +-------+ Label_Different |
-;               +-----------------+
+;   +---------------------------------+
+;   | Lable_Search_In_Root_Dir_Begin  | <-----------------+
+;   +----------------+----------------+                   |
+;                    |      RootDirSizeForLoop=0          |
+;                    +------------+                       |
+;                    |            |                       |
+;                    |  +---------v----------+            |
+;                    |  | Label_No_LoaderBin |            |
+;                    |  +--------------------+            |
+;                    |                                    |
+;     +--------------v-------------+                      |
+; +-> | Label_Search_For_LoaderBin |                 SectorNo++
+; |   +--------------+-------------+                      |
+; |                  |           DX=0                     |
+; |                  +------------+                       |
+; |                  |            |                       |
+; |                  |  +---------v-----------------------+--+
+; |                  |  | Label_Goto_Next_Sector_In_Root_Dir |
+; |                  |  +------------------------------------+
+; |                  |
+; |       +----------v---------+
+; |   +-> | Label_Cmp_FileName |
+; |   |   +----------+---------+
+; |   |              |          CX=0
+; | +-+-----------+  +------------+
+; | | Label_Go_On |  |            |
+; | +--+----------+  |  +---------v------------+
+; |    ^             |  | Label_FileName_Found |
+; |    |             |  +---------+------------+
+; |    +-------------+            |
+; |   Not Equal      |            |
+; |                  |            |
+; |       +----------v------+     |
+; +-------+ Label_Different |     |
+;         +-----------------+     |
+;                                 v
+;                    +------------+-------------+
+;                    | Label_Go_On_Loading_File |
+;                    +------------+-------------+
+;                                 |
+;                        +--------v----------+
+;                        | Label_File_Loaded |
+;                        +-------------------+
+;
+;
 ;=======  初始化查找扇区的编号
     mov word [SectorNo], SectorNumOfRootDirStart
 ;=======  先将根目录占用的扇区依次加载到内存中
@@ -197,12 +207,12 @@ Lable_Search_In_Root_Dir_Begin:
     mov dx, 10h
 ;=======  对新载入内存的根目录扇区进行遍历,查找文件名与目标文件名相同的目录项
 ;         1.缓冲区内存地址 es:di => 8000h
-;         2.待遍历扇区个数 dx(初始值为16)
+;         2.待遍历的目录项个数 dx(初始值为16)
 Label_Search_For_LoaderBin:
     ;若当前扇区的目录项遍历完后未发现目标文件
     ;则加载根目录的下一个扇区
     cmp dx, 0
-    jz Label_Goto_Next_Sector_In_Root_Dir
+    jz Label_Goto_Next_Sector_Of_Root_Dir
     dec dx
     ;文件名长度
     mov cx, 11
@@ -241,7 +251,7 @@ Label_Different:
     jmp Label_Search_For_LoaderBin
     
 ;加载根目录占用的下一个扇区
-Label_Goto_Next_Sector_In_Root_Dir:
+Label_Goto_Next_Sector_Of_Root_Dir:
     add word [SectorNo], 1
     jmp Lable_Search_In_Root_Dir_Begin
     ;jmp Label_Halt
@@ -319,6 +329,7 @@ Label_Halt:
     jmp Label_Halt
 
 ;=======  read one sector from floppy
+; 本函数对int13h中断的02号函数进行了封装
 ; ax = 待读取的磁盘扇区起始号
 ; cl = 读入的扇区数量
 ; es:bx = 目标缓冲区起始地址
@@ -338,7 +349,7 @@ Func_ReadOneSector:
     ; Head
     mov  dh,  al
     and  dh,  1
-    ; Sylinder
+    ; Cylinder
     shr  al,  1
     mov  ch,  al
     

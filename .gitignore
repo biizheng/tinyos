@@ -3,3 +3,8 @@
 *.log
 *.lst
 *.ini
+*.o
+bin/*
+
+
+.vscode
