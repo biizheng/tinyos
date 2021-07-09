@@ -87,8 +87,8 @@ Label_Loader_Start:
 
     sti
 
-    mov al, '#'
-    call Func_Loader_PrintCharInAL
+    ; mov al, '#'
+    ; call Func_Loader_PrintCharInAL
 
 ;=======  reset floppy
 ;=======  调用系统中断重置软盘
@@ -103,8 +103,8 @@ Label_Loader_Start:
 
 Lable_Search_In_Root_Dir_Begin:
 
-    mov al, '1'
-    call Func_Loader_PrintCharInAL
+    ; mov al, '1'
+    ; call Func_Loader_PrintCharInAL
 
 
     ;=======  回车，换行
@@ -131,10 +131,14 @@ Lable_Search_In_Root_Dir_Begin:
     mov cl, 1
     call Func_ReadOneSector
     
+    mov al, '%'
+    call Func_Loader_PrintCharInAL
+
     mov bp, 8000h
     call Func_PrintFileName
 
-    call Func_Loader_Halt
+    mov al, '@'
+    call Func_Loader_PrintCharInAL
 
     ; ds:si => 预先定义的文件名"KERNEL  BIN"
     ; es:di => 从硬盘读入的山区数据缓存区
@@ -158,6 +162,10 @@ Label_Search_For_KernelBin:
     ;文件名长度
     mov cx, 11
 Label_Cmp_FileName:
+
+    mov al, '.'
+    call Func_Loader_PrintCharInAL
+
     cmp cx,	0
     jz Label_FileName_Found
     dec cx
@@ -222,13 +230,11 @@ Label_FileName_Found:
 
 Label_Go_On_Loading_File:
 
-    ; push ax 
-    ; mov al, '@'
-    ; call Func_Loader_PrintCharInAL
-    ; pop ax
-
+    ; es：bx => 0x7E00 
     mov cl, 1
     call Func_ReadOneSector
+
+    ; ax => 目录项中文件的起始簇号
     pop ax
 ;;;;;;;;;;;;;;;;;;;;;;;	
     push cx
@@ -287,7 +293,7 @@ Label_Mov_Kernel:
 Label_File_Loaded:
     mov	ax, 0B800h
     mov	gs, ax
-    mov	ah, 0Fh				; 0000: 黑底    1111: 白字
+    mov	ah, 8Fh				; 0000: 黑底    1111: 白字
     mov	al, 'G'
     mov	[gs:((80 * 0 + 39) * 2)], ax	; 屏幕第 0 行, 第 39 列。
 
@@ -364,7 +370,7 @@ Func_PrintFileName:
     push bx
     push cx
     push dx
-    
+
     mov dx, 0300h ;row 5
 label_print_filename:
 
@@ -380,13 +386,10 @@ label_print_filename:
     and bp,0ffe0h
     ;跳至下一个目录项
     add bp,20h
-    pop cx
     mov al, ','
     call Func_Loader_PrintCharInAL
     loop label_print_filename
 
-    mov al, '@'
-    call Func_Loader_PrintCharInAL
 func_pfn_end:
     pop dx
     pop cx
