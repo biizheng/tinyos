@@ -23,8 +23,8 @@ MemoryStructBufferAddr  equ 0x7E00
 [SECTION gdt]
 
 LABEL_GDT:          dd  0,0
-LABEL_DESC_CODE32:  dd  0x0000FFFF,0x00CF9A00
-LABEL_DESC_DATA32:  dd  0x0000FFFF,0x00CF9200
+LABEL_DESC_CODE32:  dd  0x0000FFFF,0x00CF9A00   ;基址 0x 0000 0000
+LABEL_DESC_DATA32:  dd  0x0000FFFF,0x00CF9200   ;基址 0x 0000 0000
 
 GdtLen  equ $ - LABEL_GDT
 GdtPtr  dw  GdtLen - 1
@@ -524,7 +524,6 @@ Label_SVGA_Mode_Info_Finish:
     cmp ax,  004Fh
     jnz Label_SET_SVGA_Mode_VESA_VBE_FAIL
 
-    call Func_Loader_Halt
 
 ;=======    init IDT GDT goto protect mode 
 
@@ -546,6 +545,8 @@ Label_SVGA_Mode_Info_Finish:
 [BITS 32]
 
 GO_TO_TMP_Protect:
+
+    call Func_Loader_Halt
 
 ;=======    go to tmp long mode
 
