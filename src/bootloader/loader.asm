@@ -546,8 +546,6 @@ Label_SVGA_Mode_Info_Finish:
 
 GO_TO_TMP_Protect:
 
-    call Func_Loader_Halt
-
 ;=======    go to tmp long mode
 
     mov ax,  0x10
@@ -557,43 +555,38 @@ GO_TO_TMP_Protect:
     mov ss,  ax
     mov esp, 7E00h
 
-    call    support_long_mode
-    test    eax,    eax
+    call support_long_mode
+    test eax, eax
 
     jz  no_support
 
 ;=======    init temporary page table 0x90000
 
-    mov dword    [0x90000],  0x91007
-    mov dword    [0x90004],  0x00000
-    mov dword    [0x90800],  0x91007
-    mov dword    [0x90804],  0x00000
+    mov dword [0x90000], 0x91007
+    mov dword [0x90004], 0x00000
+    mov dword [0x90800], 0x91007
+    mov dword [0x90804], 0x00000
 
-    mov dword    [0x91000],  0x92007
-    mov dword    [0x91004],  0x00000
+    mov dword [0x91000], 0x92007
+    mov dword [0x91004], 0x00000
 
-    mov dword    [0x92000],  0x000083
-    mov dword    [0x92004],  0x000000
-
-    mov dword    [0x92008],  0x200083
-    mov dword    [0x9200c],  0x000000
-
-    mov dword    [0x92010],  0x400083
-    mov dword    [0x92014],  0x000000
-
-    mov dword    [0x92018],  0x600083
-    mov dword    [0x9201c],  0x000000
-
-    mov dword    [0x92020],  0x800083
-    mov dword    [0x92024],  0x000000
-
-    mov dword    [0x92028],  0xa00083
-    mov dword    [0x9202c],  0x000000
+    mov dword [0x92000], 0x000083
+    mov dword [0x92004], 0x000000
+    mov dword [0x92008], 0x200083
+    mov dword [0x9200c], 0x000000
+    mov dword [0x92010], 0x400083
+    mov dword [0x92014], 0x000000
+    mov dword [0x92018], 0x600083
+    mov dword [0x9201c], 0x000000
+    mov dword [0x92020], 0x800083
+    mov dword [0x92024], 0x000000
+    mov dword [0x92028], 0xa00083
+    mov dword [0x9202c], 0x000000
 
 ;=======    load GDTR
 
     db  0x66
-    lgdt    [GdtPtr64]
+    lgdt [GdtPtr64]
     mov ax,  0x10
     mov ds,  ax
     mov es,  ax
@@ -603,18 +596,19 @@ GO_TO_TMP_Protect:
 
     mov esp, 7E00h
 
-;=======    open PAE
+;======= open PAE 开启物理地址扩展功能
 
     mov eax, cr4
     bts eax, 5
     mov cr4, eax
 
-;=======    load    cr3
+;======= load cr3 
 
     mov eax, 0x90000
     mov cr3, eax
 
-;=======    enable long-mode
+;======= enable long-mode，
+;        置位IA32_EFER寄存器的LME标志位激活IA-32e模式
 
     mov ecx, 0C0000080h   ;IA32_EFER
     rdmsr
@@ -638,12 +632,12 @@ support_long_mode:
     mov eax, 0x80000000
     cpuid
     cmp eax, 0x80000001
-    setnb   al 
-    jb  support_long_mode_done
+    setnb al 
+    jb support_long_mode_done
     mov eax, 0x80000001
     cpuid
-    bt  edx,  29
-    setc    al
+    bt edx, 29
+    setc al
 support_long_mode_done:
 
     movzx   eax,   al
