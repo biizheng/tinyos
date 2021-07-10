@@ -433,7 +433,7 @@ Odd      db  0
 
 ;=======  display messages=
 
-; "Start Booting --bizheng"
+; "Start Boot" --bizheng
 StartBootMessage:   db "Start Boot"
 ; "ERROR:No LOADER Found"
 NoLoaderMessage:    db "ERR:No LOADER"

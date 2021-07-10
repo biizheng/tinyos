@@ -122,12 +122,12 @@ Lable_Search_In_Root_Dir_Begin:
 
 
     ;=======  回车，换行
-    mov al, 0x0A
-    call Func_Loader_PrintCharInAL
-    mov al, 0x0A
-    call Func_Loader_PrintCharInAL
-    mov al, 0x0D
-    call Func_Loader_PrintCharInAL
+    ; mov al, 0x0A
+    ; call Func_Loader_PrintCharInAL
+    ; mov al, 0x0A
+    ; call Func_Loader_PrintCharInAL
+    ; mov al, 0x0D
+    ; call Func_Loader_PrintCharInAL
 
 
     cmp word [RootDirSizeForLoop], 0
@@ -145,14 +145,8 @@ Lable_Search_In_Root_Dir_Begin:
     mov cl, 1
     call Func_ReadOneSector
     
-    mov al, '%'
-    call Func_Loader_PrintCharInAL
-
-    mov bp, 8000h
-    call Func_PrintFileName
-
-    mov al, '@'
-    call Func_Loader_PrintCharInAL
+    ; mov bp, 8000h
+    ; call Func_PrintFileName
 
     ; ds:si => 预先定义的文件名"KERNEL  BIN"
     ; es:di => 从硬盘读入的山区数据缓存区
@@ -177,8 +171,8 @@ Label_Search_For_KernelBin:
     mov cx, 11
 Label_Cmp_FileName:
 
-    mov al, '.'
-    call Func_Loader_PrintCharInAL
+    ; mov al, '.'
+    ; call Func_Loader_PrintCharInAL
 
     cmp cx, 0
     jz Label_FileName_Found
@@ -247,6 +241,9 @@ Label_Go_On_Loading_File:
     ; es：bx => 0x7E00 
     mov cl, 1
     call Func_ReadOneSector
+
+    mov al, '+'
+    call Func_Loader_PrintCharInAL
 
     ; ax => 目录项中文件的起始簇号
     pop ax
@@ -325,7 +322,7 @@ KillMotor:
     mov ax, 1301h
     mov bx, 000Fh
     mov dx, 0400h   ;row 4
-    mov cx, 24
+    mov cx, 44
     push ax
     mov ax, ds
     mov es, ax
@@ -333,11 +330,12 @@ KillMotor:
     mov bp, StartGetMemStructMessage
     int 10h
 
+    ;在int 15h中断函数中，ebx用于确定下一个能够探测的内存区域，初始值需要设置为0
     mov ebx, 0
+    ; es:di => 0x7e00
     mov ax, 0x00
     mov es, ax
     mov di, MemoryStructBufferAddr 
-
 Label_Get_Mem_Struct:
 
     ; 借助int 15中断服务程序来获取物理地址空间信息
@@ -346,15 +344,21 @@ Label_Get_Mem_Struct:
     mov ecx, 20
     mov edx, 0x534D4150
     int 15h
-
     ; 若内存信息获取失败，跳转至相应为位置
+    ; 当没有发生错误时,CF=0,否则CF=1
     jc Label_Get_Mem_Fail
     add di, 20
+    inc	dword [MemStructNumber]
 
+    ;int 15h中断返回一个ebx，用于确定下一个能够探测的内存区域
     cmp ebx, 0
     jne Label_Get_Mem_Struct
+    ;当ebx=0时，表示当前已经是最后一个内存区域了
     jmp Label_Get_Mem_OK
 Label_Get_Mem_Fail:
+
+    mov dword [MemStructNumber],0
+
     mov ax, 1301h
     mov bx, 008Ch
     mov dx, 0500h   ;row 5
@@ -397,7 +401,6 @@ Label_Get_Mem_OK:
     int 10h
 
     cmp ax,  004Fh
-
     jz  .KO
 ;=======    Fail
     mov ax,  1301h
@@ -413,15 +416,15 @@ Label_Get_Mem_OK:
 
     jmp $
 .KO:
-    mov ax,  1301h
-    mov bx,  000Fh
-    mov dx,  0A00h ;row 10
-    mov cx,  29
-    push    ax
-    mov ax,  ds
-    mov es,  ax
+    mov ax, 1301h
+    mov bx, 000Fh
+    mov dx, 0A00h ;row 10
+    mov cx, 29
+    push ax
+    mov ax, ds
+    mov es, ax
     pop ax
-    mov bp,  GetSVGAVBEInfoOKMessage
+    mov bp, GetSVGAVBEInfoOKMessage
     int 10h
 
 ;=======    Get SVGA Mode Info
@@ -459,6 +462,10 @@ Label_SVGA_Mode_Info_Get:
     mov al,  cl    
     call    Func_Loader_DispAL
 
+    mov eax, [DisplayPosition]
+    add eax, 2
+    mov [DisplayPosition], eax
+
     pop ax
 ;=======
 
@@ -472,6 +479,7 @@ Label_SVGA_Mode_Info_Get:
 
     jnz Label_SVGA_Mode_Info_FAIL    
 
+    inc dword [SVGAModeCounter]
     add esi, 2
     add edi, 0x100
 
@@ -505,14 +513,18 @@ Label_SVGA_Mode_Info_Finish:
     mov bp,  GetSVGAModeInfoOKMessage
     int 10h
 
+    
+
 ;=======    set the SVGA mode(VESA VBE)
 
     mov ax,  4F02h
-    mov bx,  4180h ;========================mode : 0x180 or 0x143
+    mov bx,  180h ;========================mode : 0x180 or 0x143
     int     10h
 
     cmp ax,  004Fh
     jnz Label_SET_SVGA_Mode_VESA_VBE_FAIL
+
+    call Func_Loader_Halt
 
 ;=======    init IDT GDT goto protect mode 
 
@@ -622,19 +634,19 @@ GO_TO_TMP_Protect:
 
 support_long_mode:
 
-	mov	eax,	0x80000000
-	cpuid
-	cmp	eax,	0x80000001
-	setnb	al	
-	jb	support_long_mode_done
-	mov	eax,	0x80000001
-	cpuid
-	bt	edx,	29
-	setc	al
+    mov eax, 0x80000000
+    cpuid
+    cmp eax, 0x80000001
+    setnb   al 
+    jb  support_long_mode_done
+    mov eax, 0x80000001
+    cpuid
+    bt  edx,  29
+    setc    al
 support_long_mode_done:
-	
-	movzx	eax,	al
-	ret
+
+    movzx   eax,   al
+    ret
 
 ;=======    no support
 
@@ -833,7 +845,11 @@ Odd         db  0
 ;该值（EDI寄存器）保存于临时变量OffsetOfKernelFileCount中。
 OffsetOfKernelFileCount dd  OffsetOfKernelFile
 
-DisplayPosition  dd 0
+MemStructNumber		dd	0
+
+SVGAModeCounter		dd	0
+
+DisplayPosition  dd ((80 * 16) + 0) * 2 ;屏幕地16行，第0列开始
 
 ;=======  display messages
 
@@ -846,8 +862,8 @@ NoKernelMessage: db "ERROR:No KERNEL Found"
 ;内核文件在文件系统中的 DIR_Name : "KERNEL  BIN"
 KernelFileName: db "KERNEL  BIN",0
 
-; 获取物理地址空间信息提示字符串
-StartGetMemStructMessage:       db "Start Get Memory Struct."
+; 获取物理地址空间信息提示字符串    
+StartGetMemStructMessage:       db "Start Get Memory Struct (address,size,type)."
 StartGetSVGAModeInfoMessage:    db "Start Get SVGA Mode Info"
 StartGetSVGAVBEInfoMessage:     db "Start Get SVGA VBE Info"
 GetMemStructOKMessage:          db "Get Memory Struct SUCCESSFUL!"

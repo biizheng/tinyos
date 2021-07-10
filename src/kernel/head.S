@@ -86,8 +86,8 @@ __PDE:
     .quad   0xe0e00083
     .fill   499,8,0
 
-.section .data
 //=======   GDT Table
+.section .data
 .globl GDT_Table
 
 GDT_Table:

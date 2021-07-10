@@ -1,5 +1,11 @@
 all: boot.bin loader.bin system
 	objcopy -I elf64-x86-64 -S -R ".eh_frame" -R ".comment" -O binary ./bin/system ./bin/kernel.bin
+	mount ./bin/boot.img /media/ -t vfat -o loop
+	cp ./bin/loader.bin /media/
+	cp ./bin/kernel.bin /media/
+	sync
+	umount /media/
+	exit
 
 clean:
 	rm -rf ./bin/*.bin ./bin/*.lst ./bin/*.o
