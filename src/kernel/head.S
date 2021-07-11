@@ -10,6 +10,7 @@ _start:
     mov %ax, %ss
     mov $0x7E00, %esp
 
+
 //=======   load GDTR
     lgdt GDT_POINTER(%rip)
 
@@ -17,6 +18,7 @@ _start:
     lidt IDT_POINTER(%rip)
 
     mov $0x10, %ax
+    
     mov %ax, %ds
     mov %ax, %es
     mov %ax, %fs
@@ -24,6 +26,9 @@ _start:
     mov %ax, %ss
 
     movq $0x7E00, %rsp
+
+
+
 
 //=======    load    cr3
     movq $0x101000, %rax
@@ -86,8 +91,12 @@ __PDE:
     .quad   0xe0e00083
     .fill   499,8,0
 
-//=======   GDT Table
 .section .data
+
+output:
+    .ascii "hello,world\n"    
+
+//=======   GDT Table
 .globl GDT_Table
 
 GDT_Table:

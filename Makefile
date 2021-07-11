@@ -7,6 +7,15 @@ all: boot.bin loader.bin system
 	umount /media/
 	exit
 
+all_1:boot.bin loader_1.bin system
+	objcopy -I elf64-x86-64 -S -R ".eh_frame" -R ".comment" -O binary ./bin/system ./bin/kernel.bin
+	mount ./bin/boot.img /media/ -t vfat -o loop
+	cp ./bin/loader.bin /media/
+	cp ./bin/kernel.bin /media/
+	sync
+	umount /media/
+	exit
+
 clean:
 	rm -rf ./bin/*.bin ./bin/*.lst ./bin/*.o
 
@@ -18,6 +27,9 @@ run-g:
 
 loader.bin:
 	nasm ./src/bootloader/loader.asm -o ./bin/loader.bin -l ./bin/loader.lst 
+
+loader_1.bin:
+	nasm ./src/bootloader/loader_1.asm -o ./bin/loader.bin -l ./bin/loader.lst 
 
 boot.bin:
 	nasm ./src/bootloader/boot.asm -o ./bin/boot.bin -l ./bin/boot.lst 
