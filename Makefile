@@ -33,13 +33,12 @@ loader_1.bin:
 
 boot.bin:
 	nasm ./src/bootloader/boot.asm -o ./bin/boot.bin -l ./bin/boot.lst 
-	
 
 system:	head.o main.o 
 	ld -b elf64-x86-64 -o ./bin/system ./bin/head.o ./bin/main.o -T ./script/Kernel.lds 
 
 main.o:
-	gcc  -mcmodel=large -fno-builtin -m64 -c ./src/kernel/main.c -o ./bin/main.o
+	gcc -mcmodel=large -fno-builtin -m64 -c ./src/kernel/main.c -o ./bin/main.o
 
 head.o:
 	gcc -E ./src/kernel/head.S > ./bin/head.s
