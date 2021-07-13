@@ -3,7 +3,7 @@
 org 10000h
     jmp Label_Loader_Start 
 ; 引入FAT12文件系统结构
-%include    "./include/fat12.inc"
+%include "fat12.inc"
 
 ; 内核程序起始物理地址基址  0x00
 BaseOfKernelFile        equ 0x00

@@ -17,7 +17,7 @@ void Start_Kernel(void)
 
         // 方法二：
         *((unsigned long int *) addr) = (unsigned long int) 0x00ff0000;
-        // addr += 1;
+        addr += 1;
 
         // 方法三：
         // *(addr2++) = (char)0x00;
