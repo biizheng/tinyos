@@ -12,7 +12,7 @@ SRC_ASM = $(wildcard ${DIR_BOOTLOADER}/*.asm)
 # Options   -ggdb -fno-stack-protector -ffreestanding -fno-exceptions
 CC = gcc
 C_FLAGS = -mcmodel=large -fno-builtin -m64 -c -I$(DIR_KERNEL)
-LD_FLAGS = -z muldefs -b elf64-x86-64 -T $(DIR_CONFIG)/Kernel.lds 
+LD_FLAGS = -z muldefs -b elf64-x86-64 -T $(DIR_CONFIG)/Kernel.lds
 
 # Objects ASM_SRC
 OBJ_KERNEL = $(DIR_BIN)/kernel.bin
@@ -20,27 +20,31 @@ OBJ_SYSTEM = $(DIR_BIN)/system
 OBJ_BOOT = $(patsubst %.asm, ${DIR_BIN}/%.bin, $(notdir ${SRC_ASM}))
 OBJ_C = $(patsubst %.c, ${DIR_OBJ}/%.o, $(notdir ${SRC_C}))
 
-.PHONY:all clean install run
+.PHONY:all clean prebuild install run
 
-all:$(OBJ_C) $(OBJ_BOOT) $(OBJ_KERNEL) $(OBJ_SYSTEM) 
+all:$(OBJ_C) $(OBJ_BOOT) $(OBJ_KERNEL) $(OBJ_SYSTEM)
 
 clean:
-	-rm -rf ${DIR_OBJ}/%.o $(OBJ_BOOT) $(OBJ_KERNEL) $(OBJ_SYSTEM) $(DIR_BIN)/head.s
+	-rm -rf ${DIR_OBJ}/*.o $(OBJ_BOOT) $(OBJ_KERNEL) $(OBJ_SYSTEM) $(DIR_BIN)/head.s $(DIR_BIN)/*.lst
 
-install:$(DIR_BIN)/boot.bin
+prebuild:
+	$(info ========== Creating essential directory and file ==========)
+	@sh script/prebuild.sh
+
+install:prebuild all $(DIR_BIN)/boot.bin 
 	dd if=$(DIR_BIN)/boot.bin of=$(DIR_BIN)/boot.img bs=512 count=1 conv=notrunc
 	sudo sh script/cp.sh
 
-run:all install
+run:prebuild all install
 	sh script/run.sh
 
-g-run:all install
+g-run:prebuild all install
 	sh script/run-g.sh
 
 $(DIR_BIN)/%.bin:${DIR_BOOTLOADER}/%.asm
 	$(info ========== Building $@ ==========)
-	nasm -l$(DIR_BIN)/boot.lst -I$(DIR_BOOTLOADER) -o $@ $< 
-
+	nasm -l $(patsubst %.bin,%.lst, $@) -I$(DIR_BOOTLOADER) -o $@ $<
+	
 $(OBJ_KERNEL):$(OBJ_SYSTEM)
 	$(info ========== Remove extra sections of the kernel ==========)
 	objcopy -S -R ".eh_frame" -R ".comment" -I elf64-x86-64 -O binary $< $@
@@ -55,6 +59,3 @@ $(DIR_OBJ)/head.o:$(DIR_KERNEL)/head.S
 
 ${DIR_OBJ}/%.o:$(DIR_KERNEL)/%.c
 	$(CC) $(C_FLAGS) $< -o $@
-
-$(DIR_BIN)/boot.img:
-	@echo "写入 bootloader 前需要创建硬盘镜像"
