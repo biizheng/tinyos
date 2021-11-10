@@ -5,6 +5,6 @@
 *.ini
 *.o
 bin/*
-
+obj/*
 
 .vscode
