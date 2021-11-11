@@ -20,6 +20,14 @@ SECTIONS
         
         _edata = .;
     }
+
+    .rodata :
+    {
+        _rodata = .;
+        *(.rodata)
+        
+        _erodata = .;
+    }
     .bss :
     {
         _bss = .;

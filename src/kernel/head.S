@@ -10,6 +10,7 @@ _start:
     mov %ax, %ss
     mov $0x7E00, %esp
 
+// BUGFIX : GDT  未加载
 
 //=======   load GDTR
     lgdt GDT_POINTER(%rip)

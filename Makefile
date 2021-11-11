@@ -11,8 +11,9 @@ SRC_ASM = $(wildcard ${DIR_BOOTLOADER}/*.asm)
 
 # Options   -ggdb -fno-stack-protector -ffreestanding -fno-exceptions
 CC = gcc
-C_FLAGS = -mcmodel=large -fno-builtin -m64 -c -I$(DIR_KERNEL)
-LD_FLAGS = -z muldefs -b elf64-x86-64 -T $(DIR_CONFIG)/Kernel.lds
+C_FLAGS = -mcmodel=large -fno-builtin -fno-stack-protector -m64 -c -g -I$(DIR_KERNEL) 
+LD_FLAGS = -z muldefs -T $(DIR_CONFIG)/Kernel.lds
+# -shared -fstack-protector -b elf64-x86-64  这几个flag 会导致链接时 head.s 的 .data 段数据丢失
 
 # Objects ASM_SRC
 OBJ_KERNEL = $(DIR_BIN)/kernel.bin
@@ -22,7 +23,7 @@ OBJ_C = $(patsubst %.c, ${DIR_OBJ}/%.o, $(notdir ${SRC_C}))
 
 .PHONY:all clean prebuild install run
 
-all:$(OBJ_C) $(OBJ_BOOT) $(OBJ_KERNEL) $(OBJ_SYSTEM)
+all:$(OBJ_BOOT) $(OBJ_C) $(OBJ_KERNEL) $(OBJ_SYSTEM)
 
 clean:
 	-rm -rf ${DIR_OBJ}/*.o $(OBJ_BOOT) $(OBJ_KERNEL) $(OBJ_SYSTEM) $(DIR_BIN)/head.s $(DIR_BIN)/*.lst
@@ -52,10 +53,13 @@ $(OBJ_KERNEL):$(OBJ_SYSTEM)
 $(OBJ_SYSTEM):$(DIR_OBJ)/head.o $(OBJ_C)
 	$(info ========== Linking the kernel ==========)
 	ld $(LD_FLAGS) -o $@ $^
+	objdump -d -l -M intel -S $@ > $(DIR_OBJ)/kernel_map.txt
 
 $(DIR_OBJ)/head.o:$(DIR_KERNEL)/head.S
+	$(info ========== Building $@ ==========)
 	gcc -E $< > $(DIR_BIN)/head.s
 	as --64 -o $(DIR_OBJ)/head.o $(DIR_BIN)/head.s
 
 ${DIR_OBJ}/%.o:$(DIR_KERNEL)/%.c
+	$(info ========== Building $@ ==========)
 	$(CC) $(C_FLAGS) $< -o $@
